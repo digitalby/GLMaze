@@ -12,7 +12,8 @@
 
 
 #include <GL/glew.h>
-#include <FreeImage.h>
+#include "stb_image.h"
+#include "stb_image_write.h"
 
 
 #include <stdlib.h>
@@ -47,7 +48,7 @@ static void update_uniforms();
 static GLuint create_shader(GLenum type, char *filename);
 static GLuint create_program(GLuint vertex_shader, GLuint fragment_shader);
 static int uniform_exists(char *name, GLint *location);
-static GLuint create_texture(GLsizei width, GLsizei height, GLenum format, GLfloat *data);
+static GLuint create_texture(GLsizei width, GLsizei height, GLenum format, GLenum type, const void *data);
 static GLuint generate_noise_texture();
 static void calc_gauss_values(GLint location);
 static void set_viewport(int posx, int posy, int sizex, int sizey);
@@ -56,8 +57,6 @@ static void handle_keypress(SDL_Keycode key);
 void drawer_init()
 {
 	window_add_keypress_handler(handle_keypress);
-
-	FreeImage_Initialise(0);
 
 	glewInit();
 
@@ -91,7 +90,6 @@ void drawer_init()
 
 void drawer_quit()
 {
-	FreeImage_DeInitialise();
 }
 
 void drawer_modelview_set(float matrix[16])
@@ -125,28 +123,18 @@ void drawer_use_program(Program program)
 
 Texture drawer_load_texture(char *filename)
 {
-	FIBITMAP *bmp = FreeImage_Load(FIF_JPEG, file_resource(filename, RESOURCE_TEXTURE), 0);
-
-	int image_size[2];
-	image_size[0] = FreeImage_GetWidth(bmp);
-	image_size[1] = FreeImage_GetHeight(bmp);
-
-	GLfloat *image_data = malloc(sizeof(GLfloat) * image_size[0] * image_size[1] * 3);
-	int x, y;
-	for(x=0; x<image_size[0]; x++) for(y=0; y<image_size[1]; y++)
+	int width, height, channels;
+	stbi_set_flip_vertically_on_load(1);
+	unsigned char *data = stbi_load(file_resource(filename, RESOURCE_TEXTURE), &width, &height, &channels, 3);
+	if(!data)
 	{
-		RGBQUAD color;
-		FreeImage_GetPixelColor(bmp, x, y, &color);
-		GLfloat *pixel = &image_data[(x+y*image_size[0])*3];
-		pixel[0] = color.rgbRed/255.0;
-		pixel[1] = color.rgbGreen/255.0;
-		pixel[2] = color.rgbBlue/255.0;
+		printf("Failed to load texture %s: %s\n", filename, stbi_failure_reason());
+		return 0;
 	}
 
-	GLuint texture = create_texture(image_size[0], image_size[1], GL_RGB, image_data);
+	GLuint texture = create_texture(width, height, GL_RGB, GL_UNSIGNED_BYTE, data);
 
-	free(image_data);
-	FreeImage_Unload(bmp);
+	stbi_image_free(data);
 
 	return texture;
 }
@@ -397,14 +385,15 @@ void drawer_free_mesh_vbo(MeshVBO *vbo)
 void drawer_screenshot()
 {
 	const unsigned int w = screen_size[0], h = screen_size[1];
-	GLfloat *data = malloc(sizeof(GLfloat) * w * h * 3);
+	unsigned char *data = malloc(w * h * 3);
 
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 	GLuint read;
 	glGetIntegerv(GL_READ_BUFFER, (GLint*)&read);
 	glReadBuffer(GL_FRONT);
 
-	glReadPixels(0, 0, w, h, GL_RGB, GL_FLOAT, data);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, data);
 
 	glReadBuffer(read);
 
@@ -420,22 +409,10 @@ void drawer_screenshot()
 		else fclose(f);
 	}
 
-	FIBITMAP *bmp = FreeImage_Allocate(w, h, 24, 0, 0, 0);
-	unsigned int x, y;
-	for(x=0; x<w; x++) for(y=0; y<h; y++)
-	{
-		GLfloat *pixel = &data[(x+y*w)*3];
-		RGBQUAD color;
-		color.rgbRed = pixel[0]*255.0;
-		color.rgbGreen = pixel[1]*255.0;
-		color.rgbBlue = pixel[2]*255.0;
-		FreeImage_SetPixelColor(bmp, x, y, &color);
-	}
-
-	FreeImage_Save(FIF_JPEG, bmp, filename, 0);
+	stbi_flip_vertically_on_write(1);
+	stbi_write_jpg(filename, w, h, 3, data, 90);
 
 	free(data);
-	FreeImage_Unload(bmp);
 }
 
 void drawer_print_glinfo()
@@ -510,12 +487,12 @@ static int uniform_exists(char *name, GLint *location)
 	return *location == -1 ? 0 : 1;
 }
 
-static GLuint create_texture(GLsizei width, GLsizei height, GLenum format, GLfloat *data)
+static GLuint create_texture(GLsizei width, GLsizei height, GLenum format, GLenum type, const void *data)
 {
 	GLuint texture;
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_FLOAT, data);
+	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, type, data);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -532,7 +509,7 @@ static GLuint generate_noise_texture()
 	noise_generate_texture2d_channel(16, size, size, 4, texture_data+2);
 	noise_generate_texture2d_channel(32, size, size, 4, texture_data+3);
 
-	GLuint texture = create_texture(size, size, GL_RGBA, texture_data);
+	GLuint texture = create_texture(size, size, GL_RGBA, GL_FLOAT, texture_data);
 
 	free(texture_data);
 
