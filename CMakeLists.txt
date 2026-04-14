@@ -12,9 +12,9 @@ SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/CMakeMod
 #    SHA1 "53b198e364dc7bc8360fc545f798563229bd7e20"
 #)
 
-# Mac: Make GLMaze compatible with OS X as early as 10.6
+# Mac: Make GLMaze compatible with OS X as early as 10.11
 #      has to be set before project is declared
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.6)
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.11)
 
 # Binary name
 set(PROJECT_TARGETBIN "GLMaze")
