@@ -16,10 +16,10 @@
 static float global_time;
 static float time_endgame;
 static Maze *maze;
-static Mesh *maze_mesh, *plane, *pyramid;
+static Mesh *maze_mesh, *plane, *pyramid, *finish_mesh;
 static Walker *walker;
 static Texture wall_texture, ceiling_texture, floor_texture;
-static Program textured_program, twister_program, floor_reflect_program;
+static Program textured_program, twister_program, floor_reflect_program, smiley_program;
 static Rendertarget reflection_target;
 
 static char reflection_enabled;
@@ -52,6 +52,7 @@ static void draw_ceiling(enum RenderPass pass);
 static void draw_floor(enum RenderPass pass);
 static void draw_walls(enum RenderPass pass);
 static void draw_twisters(enum RenderPass pass);
+static void draw_finish_marker(enum RenderPass pass);
 
 void scene_init()
 {
@@ -65,6 +66,7 @@ void scene_init()
 	
 	textured_program = drawer_create_program("textured.glslv", "textured.glslf");
 	twister_program = drawer_create_program("twister.glslv", "twister.glslf");
+	smiley_program = drawer_create_program("textured.glslv", "smiley.glslf");
 	
 	if(postprocess_enabled) parse_pp_pipeline_config();
 	
@@ -75,7 +77,8 @@ void scene_init()
 	}
 	
 	pyramid = mesh_create_pyramid(0.2);
-	
+	finish_mesh = mesh_create_finish_billboard(0.5);
+
 	new_game();
 }
 
@@ -210,7 +213,10 @@ static void draw_models(enum RenderPass pass)
 	
 	draw_walls(pass);
 	drawer_modelview_set(mv);
-	
+
+	draw_finish_marker(pass);
+	drawer_modelview_set(mv);
+
 	draw_twisters(pass);
 	drawer_modelview_set(mv);
 }
@@ -250,6 +256,36 @@ static void draw_walls(enum RenderPass pass)
 	drawer_use_program(textured_program);
 	drawer_use_texture(wall_texture, 0, "Diffuse");
 	drawer_draw_mesh(maze_mesh);
+}
+
+static void draw_finish_marker(enum RenderPass pass)
+{
+	unsigned int i;
+	Cell *finish = NULL;
+	for(i=0; i<maze->width*maze->height; i++)
+	{
+		if(maze->cells[i].object == OBJ_FINISH) { finish = &maze->cells[i]; break; }
+	}
+	if(!finish) return;
+
+	float temp[16];
+	drawer_modelview_get(temp);
+	translate_m4(temp, finish->x + 0.5f, 0.5f, finish->y + 0.5f);
+
+	// Billboard: replace the 3x3 rotation part of the modelview with identity
+	// so the quad always faces the camera (view-space axis-aligned).
+	temp[0] = 1.0f; temp[1] = 0.0f; temp[2]  = 0.0f;
+	temp[4] = 0.0f; temp[5] = 1.0f; temp[6]  = 0.0f;
+	temp[8] = 0.0f; temp[9] = 0.0f; temp[10] = 1.0f;
+
+	if(game_state == GAME_STARTING) scale_m4(temp, global_time/WALL_GROW_TIME, global_time/WALL_GROW_TIME, 1.0);
+	else if(game_state == GAME_ENDING) scale_m4(temp, 1.0-((global_time-time_endgame)/WALL_GROW_TIME), 1.0-((global_time-time_endgame)/WALL_GROW_TIME), 1.0);
+
+	drawer_modelview_set(temp);
+
+	drawer_use_program(smiley_program);
+	drawer_use_texture(wall_texture, 0, "Diffuse");
+	drawer_draw_mesh(finish_mesh);
 }
 
 static void draw_twisters(enum RenderPass pass)

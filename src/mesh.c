@@ -148,6 +148,32 @@ Mesh* mesh_create_pyramid(float scale)
 	return mesh;
 }
 
+Mesh* mesh_create_finish_billboard(float size)
+{
+	Mesh *mesh = allocate_mesh();
+
+	mesh->vertex_format = VERTEX_POSITION | VERTEX_TEXCOORD;
+	mesh->vertices_count = 4;
+	mesh->indices_count = 2 * 3;
+
+	allocate_data(mesh);
+
+	const float h = size * 0.5f;
+	float *v = mesh->data->vertices;
+	*v++ = -h; *v++ = -h; *v++ = 0.0f; *v++ = 0.0f; *v++ = 1.0f;
+	*v++ =  h; *v++ = -h; *v++ = 0.0f; *v++ = 1.0f; *v++ = 1.0f;
+	*v++ =  h; *v++ =  h; *v++ = 0.0f; *v++ = 1.0f; *v++ = 0.0f;
+	*v++ = -h; *v++ =  h; *v++ = 0.0f; *v++ = 0.0f; *v++ = 0.0f;
+
+	unsigned int *i = mesh->data->indices;
+	*i++ = 0; *i++ = 1; *i++ = 2;
+	*i++ = 0; *i++ = 2; *i++ = 3;
+
+	if(generate_vbo) drawer_create_mesh_vbo(mesh);
+
+	return mesh;
+}
+
 Mesh* mesh_create_screen_square()
 {
 	Mesh *mesh = allocate_mesh();
