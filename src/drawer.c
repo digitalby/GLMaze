@@ -42,6 +42,7 @@ static GLuint pp_vertex_shader, pp_fragment_shader, pp_program;
 
 static Mesh *screen_square_mesh;
 static Texture noise_texture;
+static GLuint default_vao;
 #define NOISE_TEXTURE_LAYER 7
 
 static void update_uniforms();
@@ -58,12 +59,16 @@ void drawer_init()
 {
 	window_add_keypress_handler(handle_keypress);
 
+	glewExperimental = GL_TRUE;
 	glewInit();
+	glGetError();
 
 	drawer_print_glinfo();
 
-	if(GLEW_ARB_vertex_buffer_object) mesh_generate_vbos(1);
-	else mesh_generate_vbos(0);
+	glGenVertexArrays(1, &default_vao);
+	glBindVertexArray(default_vao);
+
+	mesh_generate_vbos(1);
 
 	glClearColor(0.0, 0.0, 0.0, 0.0);
 	glEnable(GL_DEPTH_TEST);
@@ -90,6 +95,7 @@ void drawer_init()
 
 void drawer_quit()
 {
+	glDeleteVertexArrays(1, &default_vao);
 }
 
 void drawer_modelview_set(float matrix[16])

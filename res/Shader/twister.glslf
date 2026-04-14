@@ -3,10 +3,12 @@
  * file 'LICENSE', which is part of this source code package.
  */
 
-#version 120
+#version 150
+
+out vec4 fragColor;
 
 void main()
 {
 	if(!gl_FrontFacing) discard;
-	gl_FragColor = vec4(vec3(1.0), 0.7);
+	fragColor = vec4(vec3(1.0), 0.7);
 }

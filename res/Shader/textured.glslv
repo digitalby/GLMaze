@@ -3,16 +3,16 @@
  * file 'LICENSE', which is part of this source code package.
  */
 
-#version 120
+#version 150
 
 uniform mat4 MVMatrix;
 uniform mat4 MVPMatrix;
 
-attribute vec3 in_position;
-attribute vec2 in_texcoord;
+in vec3 in_position;
+in vec2 in_texcoord;
 
-varying vec3 position;
-varying vec2 texcoord;
+out vec3 position;
+out vec2 texcoord;
 
 void main()
 {
